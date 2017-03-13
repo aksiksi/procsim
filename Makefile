@@ -2,19 +2,20 @@ CC=g++
 LFLAGS=-std=c++11 -Wall
 CFLAGS=-c -std=c++11 -g -Wall
 OBJ=obj
+INCLUDE=-Iinclude
 
-DEPS=$(OBJ)/util.o $(OBJ)/lru.o $(OBJ)/victim.o $(OBJ)/block.o $(OBJ)/cache.o
-BIN=cachesim
+DEPS=$(OBJ)/util.o
+PROCSIM=procsim
 
 .PHONY: clean
 
 $(OBJ)/%.o: src/%.cpp
-	$(CC) $(CFLAGS) $^ -o $@
+	$(CC) $(INCLUDE) $(CFLAGS) $^ -o $@
 
 %: src/%.cpp $(DEPS)
-	$(CC) $(LFLAGS) $^ -o $@
+	$(CC) $(INCLUDE) $(LFLAGS) $^ -o $@
 
-default: $(CACHESIM) $(CACHEOPT)
+default: $(PROCSIM)
 
 clean:
-	rm -f $(OBJ)/* $(CACHESIM)
+	rm -f $(OBJ)/* $(PROCSIM)

@@ -1,5 +1,8 @@
-bin/
-cachesim
+procsim
 .vscode
 .DS_Store
 traces/
+CMakeLists.txt
+cmake-*/
+.idea/
+
