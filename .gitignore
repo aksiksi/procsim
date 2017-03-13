@@ -1,0 +1,5 @@
+bin/
+cachesim
+.vscode
+.DS_Store
+traces/
