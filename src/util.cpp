@@ -13,7 +13,7 @@ void exit_on_error(const std::string& msg) {
     exit(EXIT_FAILURE);
 }
 
-void parse_args(int argc, char **argv, inputargs_t& args) {
+void parse_args(int argc, char **argv, InputArgs& args) {
     if (argc < 11) {
         print_usage();
     }
