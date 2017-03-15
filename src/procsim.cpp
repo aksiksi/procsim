@@ -22,6 +22,8 @@ int main(int argc, char** argv) {
 
     std::string line;
 
+    int idx = 0;
+
     while (getline(trace_file, line)) {
         std::istringstream iss (line);
 
@@ -33,6 +35,8 @@ int main(int argc, char** argv) {
         iss >> inst.src2_reg;
 
         // TODO: Parse branch lines also
+
+        inst.idx = idx++;
 
         instructions.push_back(inst);
     }
@@ -49,7 +53,9 @@ int main(int argc, char** argv) {
     };
 
     // Create a new pipeline
-    Pipeline p (opt);
+    Pipeline p (instructions, opt);
+
+    p.start();
 
     return 0;
 }
