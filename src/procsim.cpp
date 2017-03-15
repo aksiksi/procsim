@@ -3,7 +3,7 @@
 #include <vector>
 #include <sstream>
 
-#include "procsim.hpp"
+#include "pipeline.hpp"
 #include "util.hpp"
 
 int main(int argc, char** argv) {
@@ -14,8 +14,8 @@ int main(int argc, char** argv) {
     std::ifstream trace_file (inputargs.trace_file);
 
     // Stores data for all trace file lines
-    std::vector<TraceLine> traces;
-    TraceLine tl;
+    std::vector<Instruction> instructions;
+    Instruction inst;
 
     if (!trace_file.is_open())
         exit_on_error("Unable to open trace file specified.");
@@ -25,17 +25,31 @@ int main(int argc, char** argv) {
     while (getline(trace_file, line)) {
         std::istringstream iss (line);
 
-        tl = {};
-        iss >> std::hex >> tl.addr >> std::dec;
-        iss >> tl.fu_type;
-        iss >> tl.dest_reg;
-        iss >> tl.src1_reg;
-        iss >> tl.src2_reg;
+        inst = {};
+        iss >> std::hex >> inst.addr >> std::dec;
+        iss >> inst.fu_type;
+        iss >> inst.dest_reg;
+        iss >> inst.src1_reg;
+        iss >> inst.src2_reg;
 
-        traces.push_back(tl);
+        // TODO: Parse branch lines also
+
+        instructions.push_back(inst);
     }
 
     trace_file.close();
+
+    // Setup pipeline options
+    PipelineOptions opt = {
+        .F = inputargs.F,
+        .J = inputargs.J,
+        .K = inputargs.K,
+        .L = inputargs.L,
+        .R = inputargs.R
+    };
+
+    // Create a new pipeline
+    Pipeline p (opt);
 
     return 0;
 }
