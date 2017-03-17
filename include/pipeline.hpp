@@ -4,6 +4,14 @@
 #include <deque>
 #include <vector>
 
+enum Stage {
+    FETCH,
+    DISP,
+    SCHED,
+    EXEC,
+    UPDATE
+};
+
 struct PipelineOptions {
     int F, J, K, L, R;
 };
@@ -20,6 +28,38 @@ struct Instruction {
     bool taken;
 };
 
+// Store status of an instruction as it goes through pipeline
+struct InstStatus {
+    int num;
+    Stage stage;
+
+    // Clock cycle at which instruction entered stage
+    uint64_t fetch, disp, sched, exec, state;
+
+    // Update status of the instruction
+    void update(uint64_t clock, Stage next) {
+        stage = next;
+
+        switch (next) {
+            case FETCH:
+                fetch = clock;
+                break;
+            case DISP:
+                disp = clock;
+                break;
+            case SCHED:
+                sched = clock;
+                break;
+            case EXEC:
+                exec = clock;
+                break;
+            case UPDATE:
+                state = clock;
+                break;
+        }
+    }
+};
+
 // "Reservation Station"
 // An entry in the scheduling queue
 struct RS {
@@ -33,6 +73,7 @@ struct RS {
     bool src2_ready;
     int src2_tag = -1;
     int src2_value = -1;
+    int inst_idx;
 };
 
 struct ResultBus {
@@ -45,6 +86,7 @@ struct FU {
     int id; // Uniquely identifies a FU in the table
     int type;
     int value = -1, dest = -1, tag = -1;
+    int inst_idx;
     bool busy = false;
     uint64_t start_cycle; // Cycle at which the FU started
 };
@@ -66,12 +108,12 @@ private:
     uint64_t clock;
     PipelineOptions options;
 
-    // Tomasulo data structures
     std::deque<Instruction> dispatch_q;
-    void dispatch_delete(Instruction inst);
 
     std::vector<RS> sched_q;
+    bool schedq_empty();
     void schedq_insert(Instruction& inst, RS& rs);
+    void sort_schedq(std::deque<RS>& sorted);
 
     std::vector<ResultBus> result_buses;
     int rb_find_tag(int tag); // Returns ResultBus id which is broadcasting this tag, or -1
@@ -84,6 +126,9 @@ private:
 
     std::vector<Instruction>& instructions;
     int ip; // Instruction pointer
+
+    std::vector<InstStatus> status;
+    bool check_latch(InstStatus& is);
 
     // Init the pipeline
     void init();

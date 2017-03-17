@@ -4,7 +4,7 @@ CFLAGS=-c -std=c++11 -g -Wall
 OBJ=obj
 INCLUDE=-Iinclude
 
-DEPS=$(OBJ)/util.o
+DEPS=$(OBJ)/util.o $(OBJ)/pipeline.o
 PROCSIM=procsim
 
 .PHONY: clean
