@@ -23,6 +23,7 @@ struct PipelineEntry {
     int tag;
     uint64_t cycle;
     int inst_idx;
+    int rs_idx;
 };
 
 struct PipelineStages {
@@ -43,37 +44,13 @@ struct Instruction {
     bool taken;
 };
 
-// Store status of an instruction as it goes through pipeline
+// Store status of every instruction in the trace
 struct InstStatus {
-    int num;
+    int idx;
     Stage stage;
 
     // Clock cycle at which instruction entered stage
     uint64_t fetch, disp, sched, exec, state;
-
-    // Update status of the instruction
-    void update(uint64_t clock, Stage next) {
-        stage = next;
-
-        switch (next) {
-            case FETCH:
-                fetch = clock;
-                break;
-            case DISP:
-                disp = clock;
-                break;
-            case SCHED:
-                sched = clock;
-                break;
-            case EXEC:
-                exec = clock;
-                break;
-            case UPDATE:
-            case RETIRE:
-                state = clock;
-                break;
-        }
-    }
 };
 
 // "Reservation Station"
@@ -130,6 +107,7 @@ private:
     PipelineOptions options;
 
     PipelineStages stages = {};
+    void sort_stage(std::vector<PipelineEntry>& l, Stage s);
 
     void sort_inst(std::vector<InstStatus>& st, Stage stage);
 

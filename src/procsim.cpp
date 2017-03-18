@@ -58,7 +58,7 @@ int main(int argc, char** argv) {
     p.start();
 
     for (InstStatus& is: p.status) {
-        std::cout << is.num+1 << " ";
+        std::cout << is.idx+1 << " ";
         std::cout << is.fetch+1 << " ";
         std::cout << is.disp+1 << " ";
         std::cout << is.sched+1 << " ";

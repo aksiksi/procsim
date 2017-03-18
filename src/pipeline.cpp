@@ -49,14 +49,16 @@ void Pipeline::start() {
 
     // Pipeline loop (single cycle per iteration)
     while (num_completed < instructions.size()) {
-        // Reg file written via results bus
-        // Sched queue updated via result bus
+        // Retire any completed instructions (remove from schedq)
         retire();
+
+        // Check result buses for broadcasts
         check_buses();
+
+        // Update reg file and free RBs
         update_reg_file();
 
-        // Move FU results on RBs
-        // Free up FU, and delete from schedq
+        // Move FU results on RBs and free up FUs
         state_update();
 
         // Mark independent inst. in sched queue for firing
@@ -65,13 +67,10 @@ void Pipeline::start() {
         // Dispatch unit reserves slot in sched queue
         dispatch();
 
-        ///// Phase 2
         // Fetch inst. into dispatch queue (if instructions available!)
         ip += fetch();
 
         clock++;
-
-        std::cout << clock << std::endl;
     }
 }
 
@@ -83,13 +82,15 @@ int Pipeline::fetch() {
     int count = 0;
 
     for (int i = ip; i < (ip + options.F) && i < instructions.size(); i++) {
-        Instruction inst = instructions[i];
+        Instruction& inst = instructions[i];
         dispatch_q.push_back(inst);
 
         InstStatus is = {};
-        is.num = inst.idx;
-        is.update(clock, Stage::FETCH);
-        is.update(clock+1, Stage::DISP);
+        is.idx = inst.idx;
+        is.fetch = clock;
+        is.disp = clock+1;
+        is.stage = Stage::DISP;
+
         status.push_back(is);
 
         count++;
@@ -97,16 +98,6 @@ int Pipeline::fetch() {
 
     return count;
 }
-
-bool Pipeline::schedq_empty() {
-    for (RS& rs: sched_q) {
-        if (!rs.empty)
-            return false;
-    }
-
-    return true;
-}
-
 
 void Pipeline::schedq_insert(Instruction& inst, RS& rs) {
     rs.fu_type = inst.fu_type;
@@ -150,9 +141,12 @@ void Pipeline::schedq_insert(Instruction& inst, RS& rs) {
 void Pipeline::dispatch() {
     int dispatched = 0;
     int i;
+    int rs_idx;
 
     for (i = 0; i < dispatch_q.size(); i++) {
         Instruction& inst = dispatch_q[i];
+
+        rs_idx = 0;
 
         for (RS& rs: sched_q) {
             // Add instruction to first free slot in schedQ
@@ -168,20 +162,26 @@ void Pipeline::dispatch() {
                     reg_file[dest].ready = false;
                 }
 
-                // Update status
-                status[inst.idx].update(clock+1, Stage::SCHED);
+                // Add to SCHED stage
+                InstStatus& is = status[inst.idx];
+                is.sched = clock+1;
+                is.stage = Stage::SCHED;
 
-                // Add to sched stage
+                // Create pipeline entry and add to pipeline
                 PipelineEntry pe = {};
                 pe.inst_idx = inst.idx;
+                pe.rs_idx = rs_idx;
                 pe.cycle = clock+1;
                 pe.tag = rs.dest_tag;
+
                 stages.sched.push_back(pe);
 
                 dispatched++;
 
                 break;
             }
+
+            rs_idx++;
         }
     }
 
@@ -255,21 +255,22 @@ int Pipeline::find_fu(int type) {
 
 void Pipeline::wake_up() {
     std::vector<PipelineEntry> sorted;
+    sort_stage(sorted, Stage::SCHED);
 
-    for (PipelineEntry& pe: stages.sched) {
-        if (clock >= pe.cycle)
-            sorted.push_back(pe);
-    }
-
-    if (sorted.empty())
-        return;
-
-    std::sort(sorted.begin(), sorted.end(), [](const PipelineEntry& p1, const PipelineEntry& p2) {
-        if (p1.cycle == p2.cycle)
-            return p1.tag < p2.tag;
-        else
-            return p1.cycle < p2.cycle;
-    });
+//    for (PipelineEntry& pe: stages.sched) {
+//        if (clock >= pe.cycle)
+//            sorted.push_back(pe);
+//    }
+//
+//    if (sorted.empty())
+//        return;
+//
+//    std::sort(sorted.begin(), sorted.end(), [](const PipelineEntry& p1, const PipelineEntry& p2) {
+//        if (p1.cycle == p2.cycle)
+//            return p1.tag < p2.tag;
+//        else
+//            return p1.cycle < p2.cycle;
+//    });
 
     for (PipelineEntry& pe: sorted) {
         // Find RS in question
@@ -289,9 +290,6 @@ void Pipeline::wake_up() {
 
             // Found a free FU of the given type
             if (fu_idx != -1) {
-                // Mark it in exec stage at next clock
-                status[pe.inst_idx].update(clock+1, Stage::EXEC);
-
                 // Issue the instruction
                 FU& fu = fu_table[fu_idx];
                 fu.start_cycle = clock;
@@ -300,70 +298,22 @@ void Pipeline::wake_up() {
                 fu.tag = rs.dest_tag;
                 fu.busy = true;
 
-                // Remove from sched stage
+                // Advance to EXEC stage
+                InstStatus& is = status[pe.inst_idx];
+                is.exec = clock+1;
+                is.stage = Stage::EXEC;
+
+                pe.cycle = clock+1;
+                stages.exec.push_back(pe);
+
+                // Remove from SCHED stage
                 stages.sched.remove_if([pe](PipelineEntry p1) {
                     return pe.inst_idx == p1.inst_idx;
                 });
-
-                // Move to exec stage
-                pe.cycle = clock+1;
-                stages.exec.push_back(pe);
             }
         }
     }
-
-
-//    std::vector<InstStatus> sorted_inst;
-//    sort_inst(sorted_inst, Stage::SCHED);
-//
-//    for (InstStatus& is: sorted_inst) {
-//        if (clock >= is.sched) {
-//            // Find RS in question
-//            int rs_idx = 0;
-//            for (RS& rs: sched_q) {
-//                if (rs.inst_idx == is.num)
-//                    break;
-//
-//                rs_idx++;
-//            }
-//
-//            RS& rs = sched_q[rs_idx];
-//
-//            if (rs.src1_ready && rs.src2_ready) {
-//                int fu_type = rs.fu_type;
-//                int fu_idx = find_fu(fu_type);
-//
-//                // Found a free FU of the given type
-//                if (fu_idx != -1) {
-//                    // Mark it in exec stage at next clock
-//                    status[is.num].update(clock+1, Stage::EXEC);
-////                    is.update(clock+1, Stage::EXEC);
-//
-//                    // Issue the instruction
-//                    FU& fu = fu_table[fu_idx];
-//                    fu.start_cycle = clock;
-//                    fu.inst_idx = rs.inst_idx;
-//                    fu.dest = rs.dest_reg;
-//                    fu.tag = rs.dest_tag;
-//                    fu.busy = true;
-//                }
-//            }
-//        }
-//    }
 }
-
-//void Pipeline::execute() {
-//    // Free FU complete
-//    for (FU& fu: fu_table) {
-//        if (!fu.busy)
-//            continue;
-//
-//        InstStatus& is = status[fu.inst_idx];
-//
-//        if (is.stage == Stage::EXEC && is.exec == clock)
-//            fu.busy = false;
-//    }
-//}
 
 int Pipeline::find_fu_by_tag(int tag) {
     for (FU& fu: fu_table) {
@@ -374,51 +324,50 @@ int Pipeline::find_fu_by_tag(int tag) {
     return -1;
 }
 
-void Pipeline::sort_inst(std::vector<InstStatus>& st, Stage stage) {
-    for (InstStatus& is: status) {
-        if (is.stage == stage)
-            st.push_back(is);
+void Pipeline::sort_stage(std::vector<PipelineEntry>& l, Stage s) {
+    std::list<PipelineEntry>* stage;
+
+    if (s == Stage::SCHED)
+        stage = &stages.sched;
+    else if (s == Stage::EXEC)
+        stage = &stages.exec;
+    else if (s == Stage::UPDATE)
+        stage = &stages.update;
+    else
+        return;
+
+    for (PipelineEntry& pe: *stage) {
+        if (clock >= pe.cycle)
+            l.push_back(pe);
     }
 
-    std::sort(st.begin(), st.end(), [stage](const InstStatus& i1, const InstStatus& i2) {
-        uint64_t t1 = 0, t2 = 0;
-
-        if (stage == Stage::SCHED) {
-            t1 = i1.sched;
-            t2 = i2.sched;
-        } else if (stage == Stage::EXEC) {
-            t1 = i1.exec;
-            t2 = i2.exec;
-        } else if (stage == Stage::UPDATE) {
-            t1 = i1.state;
-            t2 = i2.state;
-        }
-
-        // Sort by tag order if same cycle
-        if (t1 == t2)
-            return i1.num < i2.num;
-        else
-            return t1 < t2;
-    });
+    if (!l.empty()) {
+        std::sort(l.begin(), l.end(), [](const PipelineEntry& p1, const PipelineEntry& p2) {
+            if (p1.cycle == p2.cycle)
+                return p1.tag < p2.tag;
+            else
+                return p1.cycle < p2.cycle;
+        });
+    }
 }
 
 void Pipeline::state_update() {
     std::vector<PipelineEntry> sorted;
+    sort_stage(sorted, Stage::EXEC);
 
-    for (PipelineEntry& pe: stages.exec) {
-        if (clock >= pe.cycle)
-            sorted.push_back(pe);
-    }
-
-    if (sorted.empty())
-        return;
-
-    std::sort(sorted.begin(), sorted.end(), [](const PipelineEntry& p1, const PipelineEntry& p2) {
-        if (p1.cycle == p2.cycle)
-            return p1.tag < p2.tag;
-        else
-            return p1.cycle < p2.cycle;
-    });
+//    for (PipelineEntry& pe: stages.exec) {
+//        if (clock >= pe.cycle)
+//            sorted.push_back(pe);
+//    }
+//
+//    if (!sorted.empty()) {
+//        std::sort(sorted.begin(), sorted.end(), [](const PipelineEntry& p1, const PipelineEntry& p2) {
+//            if (p1.cycle == p2.cycle)
+//                return p1.tag < p2.tag;
+//            else
+//                return p1.cycle < p2.cycle;
+//        });
+//    }
 
     for (PipelineEntry& pe: sorted) {
         // Find RS that has this instruction
@@ -448,68 +397,26 @@ void Pipeline::state_update() {
                 rb.fu_id = fu_idx;
 
                 // Advance to UPDATE stage
-                status[pe.inst_idx].update(clock+1, Stage::UPDATE);
+                InstStatus& is = status[pe.inst_idx];
+                is.state = clock+1;
+                is.stage = Stage::UPDATE;
 
-                // Remove from exec stage
+                pe.cycle = clock+1;
+                stages.update.push_back(pe);
+
+                // Remove from EXEC stage
                 stages.exec.remove_if([pe](PipelineEntry p1) {
                     return pe.inst_idx == p1.inst_idx;
                 });
-
-                // Move to update stage
-                pe.cycle = clock+1;
-                stages.update.push_back(pe);
 
                 break;
             }
         }
     }
-
-//    // Bus allocation should be in EXEC order, followed by tag order
-//    std::vector<InstStatus> sorted_status;
-//    sort_inst(sorted_status, Stage::EXEC);
-//
-//    for (InstStatus& is: sorted_status) {
-//        if (clock >= is.exec) {
-//            // Find RS that has this instruction
-//            int rs_idx = 0;
-//            for (RS& rs: sched_q) {
-//                if (rs.inst_idx == is.num)
-//                    break;
-//
-//                rs_idx++;
-//            }
-//
-//            RS& rs = sched_q[rs_idx];
-//
-//            // Find a free RB
-//            for (ResultBus &rb: result_buses) {
-//                // Assign result from FU to a free RB
-//                if (!rb.busy) {
-//                    rb.busy = true;
-//                    rb.tag = rs.dest_tag;
-//                    rb.value = -1; // Don't really care about value from FU!
-//                    rb.reg_no = rs.dest_reg;
-//                    rb.inst_idx = rs.inst_idx;
-//
-////                    // Free up the FU
-//                    int fu_idx = find_fu_by_tag(rs.dest_tag);
-//                    fu_table[fu_idx].busy = false;
-//                    rb.fu_id = fu_idx;
-//
-//                    // Advance to UPDATE stage
-//                    status[is.num].update(clock+1, Stage::UPDATE);
-////                    is.update(clock + 1, Stage::UPDATE);
-//
-//                    break;
-//                }
-//            }
-//        }
-//    }
 }
 
 void Pipeline::update_reg_file() {
     std::vector<PipelineEntry> copy;
-
     for (PipelineEntry& pe: stages.update)
         copy.push_back(pe);
 
