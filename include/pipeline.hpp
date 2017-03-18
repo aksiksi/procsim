@@ -10,7 +10,8 @@ enum Stage {
     SCHED,
     EXEC,
     UPDATE,
-    RETIRE
+    RETIRE,
+    DONE
 };
 
 struct PipelineOptions {
@@ -54,6 +55,7 @@ struct InstStatus {
                 exec = clock;
                 break;
             case UPDATE:
+            case RETIRE:
                 state = clock;
                 break;
         }
@@ -102,6 +104,7 @@ struct Register {
 class Pipeline {
 public:
     std::vector<InstStatus> status;
+    uint64_t completed = 0;
 
     Pipeline(std::vector<Instruction>& ins, PipelineOptions& opt);
 
@@ -111,6 +114,8 @@ public:
 private:
     uint64_t clock;
     PipelineOptions options;
+
+    void sort_inst(std::vector<InstStatus>& st, Stage stage);
 
     std::deque<Instruction> dispatch_q;
 
@@ -156,6 +161,7 @@ private:
     // 5. State update unit
     void state_update();
     void update_reg_file();
+    void retire();
 
     // Tag generation
     int curr_tag = 0;
