@@ -35,6 +35,11 @@ void Pipeline::init() {
         result_buses.push_back(rb);
     }
 
+    // Initialize the register file
+    for (int i = 0; i < num_regs; i++) {
+        reg_file.push_back({i, -1, -1, true, true});
+    }
+
     // Resize the sched queue according to given params
     int q_size = 2 * (options.J + options.K + options.L);
     sched_q.resize(q_size);
@@ -47,11 +52,6 @@ void Pipeline::init() {
 
 void Pipeline::start() {
     init();
-
-    // Initialize the register file
-    for (int i = 0; i < num_regs; i++) {
-        reg_file.push_back({i, -1, -1, true, true});
-    }
 
     // Pipeline loop (single cycle per iteration)
     while (num_completed < instructions.size()) {
@@ -119,6 +119,7 @@ int Pipeline::fetch() {
 }
 
 void Pipeline::schedq_insert(Instruction& inst, RS& rs) {
+    /* Insert an Instruction into the schedQ */
     rs.fu_type = inst.fu_type;
     rs.dest_reg = inst.dest_reg;
     rs.inst_idx = inst.idx;

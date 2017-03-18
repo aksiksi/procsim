@@ -82,9 +82,8 @@ int main(int argc, char** argv) {
 
     Stats proc_stats = p.proc_stats;
 
-    output.precision(10);
-
     // Final stats
+    output.precision(10);
     output << std::endl << "Processor stats:" << std::endl;
     output << "Total instructions: " << proc_stats.total_instructions << std::endl;
     output << "Avg. dispatch queue size: " << proc_stats.avg_disp_size << std::endl;
@@ -96,6 +95,7 @@ int main(int argc, char** argv) {
     output.close();
 
     // Same stats to stdout
+    std::cout.precision(10);
     std::cout << std::endl << "Processor stats:" << std::endl;
     std::cout << "Total instructions: " << proc_stats.total_instructions << std::endl;
     std::cout << "Avg. dispatch queue size: " << proc_stats.avg_disp_size << std::endl;
