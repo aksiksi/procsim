@@ -5,6 +5,16 @@
 #include <list>
 #include <vector>
 
+struct Stats {
+    uint64_t total_instructions;
+    uint64_t total_disp_size;
+    double avg_inst_retired;
+    double avg_inst_issue;
+    double avg_disp_size;
+    uint64_t max_disp_size;
+    uint64_t cycle_count;
+};
+
 enum Stage {
     FETCH,
     DISP,
@@ -82,7 +92,6 @@ struct FU {
     int value = -1, dest = -1, tag = -1;
     int inst_idx;
     bool busy = false;
-    uint64_t start_cycle; // Cycle at which the FU started
 };
 
 // Register as stored in register file
@@ -97,6 +106,8 @@ public:
     std::vector<InstStatus> status;
     uint64_t num_completed = 0;
 
+    Stats proc_stats;
+
     Pipeline(std::vector<Instruction>& ins, PipelineOptions& opt);
 
     void start();
@@ -104,20 +115,14 @@ public:
 
 private:
     uint64_t clock;
-    PipelineOptions options;
 
+    PipelineOptions options;
     PipelineStages stages = {};
     void sort_stage(std::vector<PipelineEntry>& l, Stage s);
-
-    void sort_inst(std::vector<InstStatus>& st, Stage stage);
 
     std::deque<Instruction> dispatch_q;
 
     std::vector<RS> sched_q;
-    std::vector<RS> sorted_schedq;
-
-    void sort_schedq();
-    bool schedq_empty();
     void schedq_insert(Instruction& inst, RS& rs);
 
     std::vector<ResultBus> result_buses;
@@ -137,7 +142,6 @@ private:
     void init();
 
     // Pipeline "stages"
-
     // 1. Fetch unit
     int fetch();
 
@@ -155,7 +159,7 @@ private:
     // 5. State update unit
     void state_update();
     void update_reg_file();
-    void retire();
+    int retire();
 
     // Tag generation
     int curr_tag = 0;

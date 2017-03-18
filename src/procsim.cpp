@@ -54,17 +54,55 @@ int main(int argc, char** argv) {
 
     // Create a new pipeline
     Pipeline p (instructions, opt);
-
     p.start();
 
+    // Output results to file
+    std::string output_file = inputargs.trace_file + ".out";
+    std::ofstream output (output_file);
+
+    // Pipeline settings
+    output << "Processor settings:" << std::endl;
+    output << "R: " << opt.R << std::endl;
+    output << "k0: " << opt.J << std::endl;
+    output << "k1: " << opt.K << std::endl;
+    output << "k2: " << opt.L << std::endl;
+    output << "F: " << opt.F << std::endl << std::endl;
+
+    output << "INST  " << "FETCH  " << "DISP  " << "SCHED  " << "EXEC  " << "STATE  " << std::endl;
+
+    // Cycle-by-cycle results
     for (InstStatus& is: p.status) {
-        std::cout << is.idx+1 << " ";
-        std::cout << is.fetch+1 << " ";
-        std::cout << is.disp+1 << " ";
-        std::cout << is.sched+1 << " ";
-        std::cout << is.exec+1 << " ";
-        std::cout << is.state+1 << std::endl;
+        output << is.idx+1 << " ";
+        output << is.fetch+1 << " ";
+        output << is.disp+1 << " ";
+        output << is.sched+1 << " ";
+        output << is.exec+1 << " ";
+        output << is.state+1 << std::endl;
     }
+
+    Stats proc_stats = p.proc_stats;
+
+    output.precision(10);
+
+    // Final stats
+    output << std::endl << "Processor stats:" << std::endl;
+    output << "Total instructions: " << proc_stats.total_instructions << std::endl;
+    output << "Avg. dispatch queue size: " << proc_stats.avg_disp_size << std::endl;
+    output << "Max dispatch queue size: " << proc_stats.max_disp_size << std::endl;
+    output << "Avg. inst. issue per cycle: " << proc_stats.avg_inst_issue << std::endl;
+    output << "Avg. inst. retired per cycle: " << proc_stats.avg_inst_retired << std::endl;
+    output << "Total run time: " << proc_stats.cycle_count << std::endl << std::endl;
+
+    output.close();
+
+    // Same stats to stdout
+    std::cout << std::endl << "Processor stats:" << std::endl;
+    std::cout << "Total instructions: " << proc_stats.total_instructions << std::endl;
+    std::cout << "Avg. dispatch queue size: " << proc_stats.avg_disp_size << std::endl;
+    std::cout << "Max dispatch queue size: " << proc_stats.max_disp_size << std::endl;
+    std::cout << "Avg. inst. issue per cycle: " << proc_stats.avg_inst_issue << std::endl;
+    std::cout << "Avg. inst. retired per cycle: " << proc_stats.avg_inst_retired << std::endl;
+    std::cout << "Total run time: " << proc_stats.cycle_count << std::endl << std::endl;
 
     return 0;
 }

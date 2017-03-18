@@ -6,6 +6,7 @@ Pipeline::Pipeline(std::vector<Instruction>& ins, PipelineOptions& opt)
         : instructions(ins), options(opt) {}
 
 void Pipeline::init() {
+    // Init IP and clock
     ip = 0;
     clock = 0;
     int i, j;
@@ -37,6 +38,11 @@ void Pipeline::init() {
     // Resize the sched queue according to given params
     int q_size = 2 * (options.J + options.K + options.L);
     sched_q.resize(q_size);
+
+    // Init stats
+    proc_stats = {};
+    proc_stats.total_instructions = instructions.size();
+    proc_stats.avg_inst_issue += instructions.size();
 }
 
 void Pipeline::start() {
@@ -50,7 +56,7 @@ void Pipeline::start() {
     // Pipeline loop (single cycle per iteration)
     while (num_completed < instructions.size()) {
         // Retire any completed instructions (remove from schedq)
-        retire();
+        proc_stats.avg_inst_retired += retire();
 
         // Check result buses for broadcasts
         check_buses();
@@ -70,8 +76,22 @@ void Pipeline::start() {
         // Fetch inst. into dispatch queue (if instructions available!)
         ip += fetch();
 
+        // Record dispatch queue size
+        if (dispatch_q.size() > proc_stats.max_disp_size)
+            proc_stats.max_disp_size = dispatch_q.size();
+
+        proc_stats.avg_disp_size += dispatch_q.size();
+
         clock++;
     }
+
+    clock--;
+
+    // Collect stats
+    proc_stats.cycle_count = clock;
+    proc_stats.avg_disp_size /= clock;
+    proc_stats.avg_inst_issue /= clock;
+    proc_stats.avg_inst_retired /= clock;
 }
 
 int Pipeline::fetch() {
@@ -90,7 +110,6 @@ int Pipeline::fetch() {
         is.fetch = clock;
         is.disp = clock+1;
         is.stage = Stage::DISP;
-
         status.push_back(is);
 
         count++;
@@ -257,32 +276,8 @@ void Pipeline::wake_up() {
     std::vector<PipelineEntry> sorted;
     sort_stage(sorted, Stage::SCHED);
 
-//    for (PipelineEntry& pe: stages.sched) {
-//        if (clock >= pe.cycle)
-//            sorted.push_back(pe);
-//    }
-//
-//    if (sorted.empty())
-//        return;
-//
-//    std::sort(sorted.begin(), sorted.end(), [](const PipelineEntry& p1, const PipelineEntry& p2) {
-//        if (p1.cycle == p2.cycle)
-//            return p1.tag < p2.tag;
-//        else
-//            return p1.cycle < p2.cycle;
-//    });
-
     for (PipelineEntry& pe: sorted) {
-        // Find RS in question
-        int rs_idx = 0;
-        for (RS& rs: sched_q) {
-            if (rs.inst_idx == pe.inst_idx)
-                break;
-
-            rs_idx++;
-        }
-
-        RS& rs = sched_q[rs_idx];
+        RS& rs = sched_q[pe.rs_idx];
 
         if (rs.src1_ready && rs.src2_ready) {
             int fu_type = rs.fu_type;
@@ -292,7 +287,6 @@ void Pipeline::wake_up() {
             if (fu_idx != -1) {
                 // Issue the instruction
                 FU& fu = fu_table[fu_idx];
-                fu.start_cycle = clock;
                 fu.inst_idx = rs.inst_idx;
                 fu.dest = rs.dest_reg;
                 fu.tag = rs.dest_tag;
@@ -355,31 +349,8 @@ void Pipeline::state_update() {
     std::vector<PipelineEntry> sorted;
     sort_stage(sorted, Stage::EXEC);
 
-//    for (PipelineEntry& pe: stages.exec) {
-//        if (clock >= pe.cycle)
-//            sorted.push_back(pe);
-//    }
-//
-//    if (!sorted.empty()) {
-//        std::sort(sorted.begin(), sorted.end(), [](const PipelineEntry& p1, const PipelineEntry& p2) {
-//            if (p1.cycle == p2.cycle)
-//                return p1.tag < p2.tag;
-//            else
-//                return p1.cycle < p2.cycle;
-//        });
-//    }
-
     for (PipelineEntry& pe: sorted) {
-        // Find RS that has this instruction
-        int rs_idx = 0;
-        for (RS& rs: sched_q) {
-            if (rs.inst_idx == pe.inst_idx)
-                break;
-
-            rs_idx++;
-        }
-
-        RS& rs = sched_q[rs_idx];
+        RS& rs = sched_q[pe.rs_idx];
 
         // Find a free RB
         for (ResultBus &rb: result_buses) {
@@ -421,16 +392,7 @@ void Pipeline::update_reg_file() {
         copy.push_back(pe);
 
     for (PipelineEntry& pe: copy) {
-        // Find RS that has this instruction
-        int rs_idx = 0;
-        for (RS& rs: sched_q) {
-            if (rs.inst_idx == pe.inst_idx)
-                break;
-
-            rs_idx++;
-        }
-
-        RS& rs = sched_q[rs_idx];
+        RS& rs = sched_q[pe.rs_idx];
 
         int rb_idx = rb_find_tag(rs.dest_tag);
 
@@ -461,85 +423,30 @@ void Pipeline::update_reg_file() {
             stages.retire.push_back(pe);
         }
     }
-
-//    std::vector<InstStatus> sorted_status;
-//    sort_inst(sorted_status, Stage::UPDATE);
-//
-//    for (InstStatus& is: sorted_status) {
-//        if (clock >= is.state) {
-//            // Find RS that has this instruction
-//            int rs_idx = 0;
-//            for (RS& rs: sched_q) {
-//                if (rs.inst_idx == is.num)
-//                    break;
-//
-//                rs_idx++;
-//            }
-//
-//            RS& rs = sched_q[rs_idx];
-//
-//            int rb_idx = rb_find_tag(rs.dest_tag);
-//            ResultBus& rb = result_buses[rb_idx];
-//
-//            if (rb_idx != -1) {
-//                // Look for broadcasted tag in reg_file; otherwise, it's a dest_reg = -1
-//                if (rb.reg_no != -1) {
-//                    Register& reg = reg_file[rb.reg_no];
-//
-//                    if (reg.tag == rb.tag) {
-//                        reg.ready = true;
-//                        reg.value = rb.value;
-//                    }
-//                }
-//
-//                rb.busy = false;
-//
-//                // Retire instruction
-//                status[is.num].stage = Stage::RETIRE;
-//            }
-//        }
-//    }
-
 }
 
-void Pipeline::retire() {
-    for (PipelineEntry& pe: stages.retire) {
-        // Find RS that has this instruction
-        int rs_idx = 0;
-        for (RS& rs: sched_q) {
-            if (rs.inst_idx == pe.inst_idx)
-                break;
+int Pipeline::retire() {
+    std::vector<PipelineEntry> copy;
+    for (PipelineEntry& pe: stages.retire)
+        copy.push_back(pe);
 
-            rs_idx++;
-        }
+    uint64_t prev_completed = num_completed;
 
-        RS& rs = sched_q[rs_idx];
+    for (PipelineEntry& pe: copy) {
+        // Remove instruction from schedq
+        RS& rs = sched_q[pe.rs_idx];
         rs.empty = true;
+
+        // Mark as completed
         status[pe.inst_idx].stage = Stage::DONE;
 
+        // Remove from retire stage
         stages.retire.remove_if([pe](PipelineEntry p1) {
             return pe.inst_idx == p1.inst_idx;
         });
 
         num_completed++;
     }
-//    for (InstStatus& is: status) {
-//        if (is.stage == Stage::RETIRE) {
-//            // Find RS that has this instruction
-//            int rs_idx = 0;
-//            for (RS& rs: sched_q) {
-//                if (rs.inst_idx == is.num)
-//                    break;
-//
-//                rs_idx++;
-//            }
-//
-//            RS& rs = sched_q[rs_idx];
-//            rs.empty = true;
-//
-//            is.stage = Stage::DONE;
-//
-//            num_completed++;
-//        }
-//    }
+
+    return static_cast<int>(num_completed - prev_completed);
 }
