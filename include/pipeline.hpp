@@ -2,6 +2,7 @@
 #define PIPELINE_HPP
 
 #include <deque>
+#include <list>
 #include <vector>
 
 enum Stage {
@@ -16,6 +17,19 @@ enum Stage {
 
 struct PipelineOptions {
     int F, J, K, L, R;
+};
+
+struct PipelineEntry {
+    int tag;
+    uint64_t cycle;
+    int inst_idx;
+};
+
+struct PipelineStages {
+    std::list<PipelineEntry> sched;
+    std::list<PipelineEntry> exec;
+    std::list<PipelineEntry> update;
+    std::list<PipelineEntry> retire;
 };
 
 // Single instruction as parsed from trace file
@@ -104,7 +118,7 @@ struct Register {
 class Pipeline {
 public:
     std::vector<InstStatus> status;
-    uint64_t completed = 0;
+    uint64_t num_completed = 0;
 
     Pipeline(std::vector<Instruction>& ins, PipelineOptions& opt);
 
@@ -114,6 +128,8 @@ public:
 private:
     uint64_t clock;
     PipelineOptions options;
+
+    PipelineStages stages = {};
 
     void sort_inst(std::vector<InstStatus>& st, Stage stage);
 
