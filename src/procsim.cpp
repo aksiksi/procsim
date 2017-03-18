@@ -31,8 +31,8 @@ int main(int argc, char** argv) {
         iss >> std::hex >> inst.addr >> std::dec;
         iss >> inst.fu_type;
         iss >> inst.dest_reg;
-        iss >> inst.src1_reg;
-        iss >> inst.src2_reg;
+        iss >> inst.src_reg[0];
+        iss >> inst.src_reg[1];
 
         // TODO: Parse branch lines also
 
@@ -56,6 +56,15 @@ int main(int argc, char** argv) {
     Pipeline p (instructions, opt);
 
     p.start();
+
+    for (InstStatus& is: p.status) {
+        std::cout << is.num+1 << " ";
+        std::cout << is.fetch+1 << " ";
+        std::cout << is.disp+1 << " ";
+        std::cout << is.sched+1 << " ";
+        std::cout << is.exec+1 << " ";
+        std::cout << is.state+1 << std::endl;
+    }
 
     return 0;
 }

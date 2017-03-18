@@ -9,7 +9,8 @@ enum Stage {
     DISP,
     SCHED,
     EXEC,
-    UPDATE
+    UPDATE,
+    RETIRE
 };
 
 struct PipelineOptions {
@@ -22,8 +23,7 @@ struct Instruction {
     int addr;
     int fu_type;
     int dest_reg;
-    int src1_reg;
-    int src2_reg;
+    int src_reg[2];
     int branch_addr;
     bool taken;
 };
@@ -80,6 +80,7 @@ struct ResultBus {
     int fu_id = -1;
     bool busy = false;
     int value, tag, reg_no;
+    int inst_idx;
 };
 
 struct FU {
@@ -95,10 +96,13 @@ struct FU {
 struct Register {
     int num, tag, value;
     bool ready;
+    bool empty;
 };
 
 class Pipeline {
 public:
+    std::vector<InstStatus> status;
+
     Pipeline(std::vector<Instruction>& ins, PipelineOptions& opt);
 
     void start();
@@ -111,24 +115,24 @@ private:
     std::deque<Instruction> dispatch_q;
 
     std::vector<RS> sched_q;
+    std::vector<RS> sorted_schedq;
+
+    void sort_schedq();
     bool schedq_empty();
     void schedq_insert(Instruction& inst, RS& rs);
-    void sort_schedq(std::deque<RS>& sorted);
 
     std::vector<ResultBus> result_buses;
     int rb_find_tag(int tag); // Returns ResultBus id which is broadcasting this tag, or -1
 
     std::vector<FU> fu_table;
     int find_fu(int type);
+    int find_fu_by_tag(int tag);
 
     int num_regs = 128;
     std::vector<Register> reg_file;
 
     std::vector<Instruction>& instructions;
     int ip; // Instruction pointer
-
-    std::vector<InstStatus> status;
-    bool check_latch(InstStatus& is);
 
     // Init the pipeline
     void init();
@@ -150,8 +154,8 @@ private:
     void update();
 
     // 5. State update unit
+    void state_update();
     void update_reg_file();
-    void delete_completed();
 
     // Tag generation
     int curr_tag = 0;
