@@ -3,7 +3,7 @@
 #include "pipeline.hpp"
 
 Pipeline::Pipeline(std::vector<Instruction>& ins, PipelineOptions& opt)
-        : instructions(ins), options(opt) {}
+        : options(opt), instructions(ins) {}
 
 void Pipeline::init() {
     // Init IP and clock

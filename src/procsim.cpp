@@ -96,7 +96,7 @@ int main(int argc, char** argv) {
     std::cout << "*** Pipeline completed successfully (cycles=" << proc_stats.cycle_count << ")" << std::endl;
 
     // Final stats
-    output.precision(10);
+    output.precision(12);
     output << std::endl << "Processor stats:" << std::endl;
     output << "Total instructions: " << proc_stats.total_instructions << std::endl;
     output << "Avg. dispatch queue size: " << proc_stats.avg_disp_size << std::endl;
@@ -110,7 +110,7 @@ int main(int argc, char** argv) {
     output.close();
 
     // Same stats to stdout
-    std::cout.precision(10);
+    std::cout.precision(12);
     std::cout << std::endl << "Processor stats:" << std::endl;
     std::cout << "Total instructions: " << proc_stats.total_instructions << std::endl;
     std::cout << "Avg. dispatch queue size: " << proc_stats.avg_disp_size << std::endl;
