@@ -413,16 +413,15 @@ void Pipeline::update_reg_file() {
 
             rb.busy = false;
 
-            // Retire instruction
+            // Move to RETIRE stage
             status[pe.inst_idx].stage = Stage::RETIRE;
+            pe.cycle = clock+1;
+            stages.retire.push_back(pe);
 
+            // Remove from UPDATE
             stages.update.remove_if([pe](PipelineEntry p1) {
                 return pe.inst_idx == p1.inst_idx;
             });
-
-            // Move to update stage
-            pe.cycle = clock+1;
-            stages.retire.push_back(pe);
         }
     }
 }
@@ -442,7 +441,7 @@ int Pipeline::retire() {
         // Mark as completed
         status[pe.inst_idx].stage = Stage::DONE;
 
-        // Remove from retire stage
+        // Remove from RETIRE
         stages.retire.remove_if([pe](PipelineEntry p1) {
             return pe.inst_idx == p1.inst_idx;
         });

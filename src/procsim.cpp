@@ -6,8 +6,6 @@
 #include "pipeline.hpp"
 #include "util.hpp"
 
-#define DEBUG
-
 int main(int argc, char** argv) {
     // Unbuffered output
     std::cout.setf(std::ios::unitbuf);

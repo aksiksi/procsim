@@ -1,6 +1,6 @@
 CC=g++
 LFLAGS=-std=c++11
-CFLAGS=-c -std=c++11
+CFLAGS=-c -O3 -std=c++11
 OBJ=obj
 INCLUDE=-Iinclude
 
