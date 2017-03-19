@@ -9,16 +9,19 @@
 #define DEBUG
 
 int main(int argc, char** argv) {
-    #ifdef DEBUG
-        // Unbuffered output
-        std::cout.setf(std::ios::unitbuf);
-    #endif
+    // Unbuffered output
+    std::cout.setf(std::ios::unitbuf);
 
     // Parse command line args
     InputArgs inputargs = {};
     parse_args(argc, argv, inputargs);
 
+    // Input file
     std::ifstream trace_file (inputargs.trace_file);
+
+    // Output results file
+    std::string output_file = inputargs.trace_file + ".out";
+    std::ofstream output (output_file);
 
     // Stores data for all trace file lines
     std::vector<Instruction> instructions;
@@ -50,6 +53,10 @@ int main(int argc, char** argv) {
 
     trace_file.close();
 
+    std::cout << "* Input file: " << inputargs.trace_file << std::endl;
+    std::cout << "*** " << instructions.size() << " instructions read from trace file" << std::endl;
+    std::cout << "* Pipeline started; please wait for results" << std::endl;
+
     // Setup pipeline options
     PipelineOptions opt = {
         .F = inputargs.F,
@@ -61,11 +68,8 @@ int main(int argc, char** argv) {
 
     // Create a new pipeline
     Pipeline p (instructions, opt);
-    p.start();
 
-    // Output results to file
-    std::string output_file = inputargs.trace_file + ".out";
-    std::ofstream output (output_file);
+    p.start();
 
     // Pipeline settings
     output << "Processor settings:" << std::endl;
@@ -89,6 +93,8 @@ int main(int argc, char** argv) {
 
     Stats proc_stats = p.proc_stats;
 
+    std::cout << "*** Pipeline completed successfully (cycles=" << proc_stats.cycle_count << ")" << std::endl;
+
     // Final stats
     output.precision(10);
     output << std::endl << "Processor stats:" << std::endl;
@@ -98,6 +104,8 @@ int main(int argc, char** argv) {
     output << "Avg. inst. issue per cycle: " << proc_stats.avg_inst_issue << std::endl;
     output << "Avg. inst. retired per cycle: " << proc_stats.avg_inst_retired << std::endl;
     output << "Total run time: " << proc_stats.cycle_count << std::endl << std::endl;
+
+    std::cout << "* Results written to: " << output_file << std::endl;
 
     output.close();
 
