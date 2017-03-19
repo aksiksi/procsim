@@ -6,7 +6,14 @@
 #include "pipeline.hpp"
 #include "util.hpp"
 
+#define DEBUG
+
 int main(int argc, char** argv) {
+    #ifdef DEBUG
+        // Unbuffered output
+        std::cout.setf(std::ios::unitbuf);
+    #endif
+
     // Parse command line args
     InputArgs inputargs = {};
     parse_args(argc, argv, inputargs);
@@ -18,7 +25,7 @@ int main(int argc, char** argv) {
     Instruction inst;
 
     if (!trace_file.is_open())
-        exit_on_error("Unable to open trace file specified.");
+        exit_on_error("Unable to open trace file specified (" + inputargs.trace_file + ")");
 
     std::string line;
 

@@ -23,10 +23,8 @@ The program takes the following arguments:
 * `-k`: number of k1 FUs
 * `-l`: number of k2 FUs
 * `-r`: number of result buses (RBs)
+* `-i`: input trace file
 
-The trace file should be passed in as the last argument.
-
-Example: `procsim -f 4 -j 3 -k 2 -l 1 -r 2 gcc.100k.trace`
+Example: `procsim -f 4 -j 3 -k 2 -l 1 -r 2 -i gcc.100k.trace`
 
 The output file will have the same name but with the extension `.out` and written to the same directory. In the example above, `gcc.100k.trace.out`.
-
