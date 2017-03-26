@@ -5,4 +5,4 @@ traces/
 CMakeLists.txt
 cmake-*/
 .idea/
-
+*.gz

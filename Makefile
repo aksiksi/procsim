@@ -4,7 +4,7 @@ CFLAGS=-c -O3 -std=c++11
 OBJ=obj
 INCLUDE=-Iinclude
 
-DEPS=$(OBJ)/util.o $(OBJ)/pipeline.o
+DEPS=$(OBJ)/util.o $(OBJ)/pipeline.o $(OBJ)/predictor.o
 PROCSIM=procsim
 
 $(OBJ)/%.o: src/%.cpp

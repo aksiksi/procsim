@@ -41,6 +41,9 @@ void Pipeline::init() {
         reg_file.push_back({i, -1, -1, true, true});
     }
 
+    // Pre-allocate memory for instruction storage
+    status.reserve(instructions.size());
+
     // Resize the sched queue according to given params
     int q_size = 2 * (options.J + options.K + options.L);
     sched_q.resize(q_size);
