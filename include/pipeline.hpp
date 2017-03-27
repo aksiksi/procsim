@@ -5,6 +5,8 @@
 #include <list>
 #include <vector>
 
+#include "predictor.hpp"
+
 struct Stats {
     uint64_t total_instructions;
     uint64_t total_disp_size;
@@ -23,6 +25,12 @@ enum Stage {
     UPDATE,
     RETIRE,
     DONE
+};
+
+enum Misprediction {
+    NONE,
+    TAKEN,
+    NOT_TAKEN
 };
 
 struct PipelineOptions {
@@ -50,8 +58,9 @@ struct Instruction {
     int fu_type;
     int dest_reg;
     int src_reg[2];
-    int branch_addr;
-    bool taken;
+    int branch_addr = -1;
+    bool taken = false; // Actual branch result
+    bool p_taken = false; // Predicted branch result
 };
 
 // Store status of every instruction in the trace
@@ -109,6 +118,7 @@ public:
     Stats proc_stats;
 
     Pipeline(std::vector<Instruction>& ins, PipelineOptions& opt);
+    ~Pipeline();
 
     void start();
     void flush();
@@ -137,6 +147,12 @@ private:
 
     std::vector<Instruction>& instructions;
     int ip; // Instruction pointer
+
+    // Branch prediction support
+    BranchPredictor* predictor;
+    Misprediction mp;
+    int fetch_garbage(int curr, bool taken);
+    int prev_ip;
 
     // Init the pipeline
     void init();

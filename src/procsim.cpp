@@ -42,7 +42,11 @@ int main(int argc, char** argv) {
         iss >> inst.src_reg[0];
         iss >> inst.src_reg[1];
 
-        // TODO: Parse branch lines also
+        // If branch line, extract branch address and taken flag
+        if (!iss.eof()) {
+            iss >> std::hex >> inst.branch_addr >> std::dec;
+            iss >> inst.taken;
+        }
 
         inst.idx = idx++;
 

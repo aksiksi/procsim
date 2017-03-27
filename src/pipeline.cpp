@@ -6,6 +6,10 @@
 Pipeline::Pipeline(std::vector<Instruction>& ins, PipelineOptions& opt)
         : options(opt), instructions(ins) {}
 
+Pipeline::~Pipeline() {
+    delete predictor;
+}
+
 void Pipeline::init() {
     // Init IP and clock
     ip = 0;
@@ -52,6 +56,11 @@ void Pipeline::init() {
     proc_stats = {};
     proc_stats.total_instructions = instructions.size();
     proc_stats.avg_inst_issue += instructions.size();
+
+    // Init predictor with 128 entries and 8 Smith counters per entry (3-bit GHR)
+    int n = 128;
+    int k = 3;
+    predictor = new BranchPredictor(n, k);
 }
 
 void Pipeline::start() {
@@ -106,15 +115,73 @@ int Pipeline::fetch() {
     int count = 0;
 
     for (int i = ip; i < (ip + options.F) && i < instructions.size(); i++) {
+        // Mispredict mode; keep fetching garbage
+        if (mp != Misprediction::NONE) {
+            count += fetch_garbage(i, mp == Misprediction::TAKEN);
+            break;
+        }
+
         Instruction& inst = instructions[i];
+
+        // Perform branch prediction (if applicable)
+        if (inst.branch_addr != -1) {
+            bool taken = predictor->predict(inst.branch_addr);
+            inst.p_taken = taken;
+
+            // If wrong, fetch garbage instructions and track status
+            if (taken != inst.taken) {
+                count += fetch_garbage(i, taken);
+
+                // Track status
+                if (taken)
+                    mp = Misprediction::TAKEN;
+                else
+                    mp = Misprediction::NOT_TAKEN;
+
+                prev_ip = ip;
+
+                break;
+            }
+        }
+
         dispatch_q.push_back(inst);
 
+        // Create a InstStatus entry to track instruction progress
         InstStatus is = {};
         is.idx = inst.idx;
         is.fetch = clock;
         is.disp = clock+1;
         is.stage = Stage::DISP;
         status.push_back(is);
+
+        count++;
+    }
+
+    return count;
+}
+
+int Pipeline::fetch_garbage(int curr, bool taken) {
+    int count = 0;
+
+    for (int i = curr; i < (ip + options.F) && i < instructions.size(); i++) {
+        // Create a dummy instruction and dispatch it
+        Instruction inst = {};
+
+        // FU depends on prediction
+        if (taken)
+            inst.fu_type = 1;
+        else
+            inst.fu_type = 2;
+
+        inst.dest_reg = -1;
+        inst.addr = -1;
+        inst.src_reg[0] = -1;
+        inst.src_reg[1] = -1;
+        inst.idx = -1;
+
+        // TODO: track new instructions to flush??
+
+        dispatch_q.push_back(inst);
 
         count++;
     }
@@ -379,6 +446,9 @@ void Pipeline::state_update() {
 
                 pe.cycle = clock+1;
                 stages.update.push_back(pe);
+
+                // Perform flush of ROB if needed!
+                // Don't forget to set misprediction = NONE
 
                 // Remove from EXEC stage
                 stages.exec.remove_if([pe](PipelineEntry p1) {

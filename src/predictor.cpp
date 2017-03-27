@@ -11,7 +11,7 @@ BranchPredictor::BranchPredictor(int n, int k) : n(n), k(k) {
     for (int i = 0; i < n; i++) {
         std::vector<int> counters;
         for (int j = 0; j < (1 << ghr_size); j++)
-            counter.push_back(1);
+            counters.push_back(1);
 
         prediction_table.push_back(counters);
     }

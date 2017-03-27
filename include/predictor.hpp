@@ -9,7 +9,7 @@
  */
 class BranchPredictor {
 public:
-    BranchPredictor(int n);
+    BranchPredictor(int n, int k);
     bool predict(int address);
     void update(int address, bool taken);
 private:
