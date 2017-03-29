@@ -27,6 +27,14 @@ enum Stage {
     DONE
 };
 
+struct ROBEntry {
+    int inst_idx;
+    int ip; // Instruction pointer
+    int tag, value, dest_reg;
+    bool branch, taken, p_taken;
+    bool complete;
+};
+
 enum Misprediction {
     NONE,
     TAKEN,
@@ -118,7 +126,6 @@ public:
     Stats proc_stats;
 
     Pipeline(std::vector<Instruction>& ins, PipelineOptions& opt);
-    ~Pipeline();
 
     void start();
     void flush();
@@ -151,8 +158,12 @@ private:
     // Branch prediction support
     BranchPredictor* predictor;
     Misprediction mp;
-    int fetch_garbage(int curr, bool taken);
+    void fetch_garbage(int count, bool taken);
     int prev_ip;
+
+    // Reorder buffer
+    std::deque<ROBEntry> rob;
+    void flush_rob();
 
     // Init the pipeline
     void init();
@@ -160,6 +171,7 @@ private:
     // Pipeline "stages"
     // 1. Fetch unit
     int fetch();
+    int num_fetched = 0;
 
     // 2. Dispatch unit
     void dispatch();
@@ -170,11 +182,9 @@ private:
 
     // 4. Execution unit
     void execute();
-    void update();
 
     // 5. State update unit
     void state_update();
-    void update_reg_file();
     int retire();
 
     // Tag generation
