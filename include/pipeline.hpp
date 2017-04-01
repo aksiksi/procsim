@@ -31,6 +31,7 @@ struct ROBEntry {
     int inst_idx;
     int ip; // Instruction pointer
     int tag, value, dest_reg;
+    int address;
     bool branch, taken, p_taken;
     bool complete;
 };
@@ -50,6 +51,7 @@ struct PipelineEntry {
     uint64_t cycle;
     int inst_idx;
     int rs_idx;
+    bool dummy = false;
 };
 
 struct PipelineStages {
@@ -63,6 +65,7 @@ struct PipelineStages {
 struct Instruction {
     int idx;
     int addr;
+    int ip;
     int fu_type;
     int dest_reg;
     int src_reg[2];
@@ -75,9 +78,11 @@ struct Instruction {
 struct InstStatus {
     int idx;
     Stage stage;
+    int inst; // Position of inst. in instructions vector
+    bool dummy = false;
 
     // Clock cycle at which instruction entered stage
-    uint64_t fetch, disp, sched, exec, state;
+    long fetch, disp, sched, exec, state;
 };
 
 // "Reservation Station"
@@ -128,7 +133,6 @@ public:
     Pipeline(std::vector<Instruction>& ins, PipelineOptions& opt);
 
     void start();
-    void flush();
 
 private:
     uint64_t clock;
@@ -158,12 +162,14 @@ private:
     // Branch prediction support
     BranchPredictor* predictor;
     Misprediction mp;
+    bool branch_flush = false;
+    int branch_idx = -1;
+    std::deque<int> branches;
     void fetch_garbage(int count, bool taken);
-    int prev_ip;
+    void update_prediction(Instruction& re);
 
     // Reorder buffer
     std::deque<ROBEntry> rob;
-    void flush_rob();
 
     // Init the pipeline
     void init();

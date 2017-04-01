@@ -7,6 +7,8 @@ Pipeline::Pipeline(std::vector<Instruction>& ins, PipelineOptions& opt)
         : options(opt), instructions(ins) {}
 
 void Pipeline::init() {
+    std::cout.sync_with_stdio(false);
+
     // Init IP and clock
     ip = 0;
     clock = 0;
@@ -58,7 +60,7 @@ void Pipeline::init() {
     int k = 3;
     predictor = new BranchPredictor(n, k);
 }
-
+// Clock == 65
 void Pipeline::start() {
     init();
 
@@ -66,6 +68,8 @@ void Pipeline::start() {
     while (num_completed < instructions.size()) {
         // Retire any completed instructions (remove from schedq)
         proc_stats.avg_inst_retired += retire();
+
+        std::cout << branches.size() << std::endl;
 
         // Check result buses for broadcasts
         check_buses();
@@ -123,44 +127,61 @@ int Pipeline::fetch() {
 
         // Insert instruction into dispatch queue
         Instruction& inst = instructions[i];
+        inst.idx = num_fetched++;
+        inst.ip = i;
         dispatch_q.push_back(inst);
 
         // Create a InstStatus entry to track instruction progress
         InstStatus is = {};
-        is.idx = num_fetched++;
+        is.idx = inst.idx;
         is.fetch = clock;
         is.disp = clock+1;
         is.stage = Stage::DISP;
+        is.inst = i;
         status.push_back(is);
 
         // Allocate instruction into ROB
         ROBEntry re = {};
         re.ip = i;
         re.branch = false;
-        re.inst_idx = is.idx;
+        re.inst_idx = inst.idx;
         re.complete = false;
+        re.address = inst.branch_addr;
 
-        if (inst.branch_addr == -1)
+        if (inst.branch_addr == -1) {
             rob.push_front(re);
+            count++;
+        }
 
         // Perform branch prediction (since it's a branch!)
         else {
-            bool taken = predictor->predict(inst.branch_addr);
+            bool prediction = predictor->predict(inst.addr);
+
+            std::cout << "Branch: " << std::hex << inst.branch_addr << " Actual: " << inst.taken << " Predicted: " << std::dec << prediction;
+            std::cout << "  Index: " << inst.idx << " GHR: " << predictor->get_ghr() << " Inst: " << is.inst << std::endl;
 
             // Store prediction and correct result
             re.branch = true;
-            re.p_taken = taken;
+            re.p_taken = prediction;
             re.taken = inst.taken;
 
+            // Store prediction with inst.
+            inst.p_taken = prediction;
+
+            // Record branch index
+            branches.push_back(inst.idx);
+            std::cout << branches.front() << " " << branches.back() << " " << branches.size() << std::endl;
+
             rob.push_front(re);
+            count++;
 
             // If wrong, fetch garbage instructions and track status
-            if (taken != inst.taken) {
+            if (re.p_taken != inst.taken) {
                 int c = (ip + options.F) - (i + 1); // Number of garbage inst. to fetch
-                fetch_garbage(c, taken);
+                fetch_garbage(c, prediction);
 
                 // Track status of pipeline
-                if (taken)
+                if (prediction)
                     mp = Misprediction::TAKEN;
                 else
                     mp = Misprediction::NOT_TAKEN;
@@ -168,8 +189,6 @@ int Pipeline::fetch() {
                 break;
             }
         }
-
-        count++;
     }
 
     return count;
@@ -183,7 +202,7 @@ void Pipeline::fetch_garbage(int count, bool taken) {
         inst.addr = -1;
         inst.src_reg[0] = -1;
         inst.src_reg[1] = -1;
-        inst.idx = ++num_fetched;
+        inst.idx = num_fetched++;
 
         // FU depends on prediction
         if (taken)
@@ -195,21 +214,20 @@ void Pipeline::fetch_garbage(int count, bool taken) {
 
         // Track the status of this dummy instruction
         InstStatus is = {};
-        is.idx = num_fetched++;
+        is.idx = inst.idx;
         is.fetch = clock;
         is.disp = clock+1;
         is.stage = Stage::DISP;
+        is.dummy = true;
         status.push_back(is);
 
         // Allocate to ROB
         ROBEntry re = {};
         re.ip = -1;
         re.branch = false;
-        re.inst_idx = is.idx;
+        re.inst_idx = inst.idx;
         re.complete = false;
         rob.push_front(re);
-
-        i++;
     }
 }
 
@@ -288,6 +306,7 @@ void Pipeline::dispatch() {
                 pe.rs_idx = rs_idx;
                 pe.cycle = clock+1;
                 pe.tag = rs.dest_tag;
+                pe.dummy = is.dummy;
 
                 stages.sched.push_back(pe);
 
@@ -393,6 +412,14 @@ void Pipeline::wake_up() {
                 is.exec = clock+1;
                 is.stage = Stage::EXEC;
 
+                // Set flag for flush next cycle
+                for (int idx: branches) {
+                    if (pe.inst_idx == idx) {
+                        branch_flush = true;
+                        branch_idx = idx;
+                    }
+                }
+
                 pe.cycle = clock+1;
                 stages.exec.push_back(pe);
 
@@ -452,139 +479,153 @@ void Pipeline::sort_stage(std::vector<PipelineEntry>& l, Stage s) {
 }
 
 void Pipeline::execute() {
-    std::vector<PipelineEntry> sorted;
-    sort_stage(sorted, Stage::EXEC);
+    // TODO: Look at inst_idx=101 (branch should be predicted correctly!)
 
-    // Start from ROB end ("head")
-    // If instruction is complete, put onto a RB
-    // If instruction is a branch, check if prediction correct
-    // If prediction wrong, flush EVERYTHING
+    // Update branch prediction as soon as a branch is in EXEC
+    if (branch_flush) {
+        InstStatus& is = status[branch_idx];
+        Instruction& inst = instructions[is.inst];
 
-    // Track number of instructions to remove from ROB
-    int num_done = 0;
+        if (clock == is.exec+1) {
+            update_prediction(inst);
+            branch_flush = false;
 
-    for (auto it = rob.rend(); it != rob.rbegin(); ++it) {
-        // Stop checking ROB if instruction is not complete yet
-        ROBEntry& re = *it;
-        if (!re.complete)
-            break;
-
-        for (PipelineEntry& pe: sorted) {
-            // Find correct entry in pipeline
-            if (pe.inst_idx != re.inst_idx)
-                continue;
-
-            RS& rs = sched_q[pe.rs_idx];
-
-            // Find a free RB
-            for (ResultBus &rb: result_buses) {
-                // Assign result from FU to a free RB
-                if (!rb.busy) {
-                    rb.busy = true;
-                    rb.tag = rs.dest_tag;
-                    rb.value = -1; // Don't really care about value from FU!
-                    rb.reg_no = rs.dest_reg;
-                    rb.inst_idx = rs.inst_idx;
-
-                    // Free up the FU
-                    int fu_idx = find_fu_by_tag(rs.dest_tag);
-                    fu_table[fu_idx].busy = false;
-                    rb.fu_id = fu_idx;
-
-                    // Advance to UPDATE stage
-                    InstStatus& is = status[pe.inst_idx];
-                    is.state = clock+1;
-                    is.stage = Stage::UPDATE;
-
-                    pe.cycle = clock+1;
-                    stages.update.push_back(pe);
-
-                    // Remove from EXEC stage
-                    stages.exec.remove_if([pe](PipelineEntry p1) {
-                        return pe.inst_idx == p1.inst_idx;
-                    });
-
-                    num_done++;
-
-                    break;
-                }
-            }
-        }
-
-        if (re.branch) {
-            // Check if prediction incorrect
-            if (re.taken != re.p_taken) {
-                // Flush everything from DISP and clear the queue
-                for (Instruction& i: dispatch_q)
-                    status[i.idx].disp = 0;
-
-                dispatch_q.clear();
-
-                // Flush the EXEC and SCHED and mark that in InstStatus
-                for (PipelineEntry& pe: stages.sched)
-                    status[pe.inst_idx].sched = 0;
-
-                stages.sched.clear();
-
-                for (PipelineEntry& pe: stages.exec)
-                    status[pe.inst_idx].exec = 0;
-
-                stages.exec.clear();
-
-                // Empty the sched queue
-                for (RS& rs: sched_q) {
-                    if (rs.inst_idx > re.inst_idx)
-                        rs.empty = true;
-                }
-            }
-
-            // Update GHR entry in predictor
-            // TODO
+            // Remove resolved branch from idx list
+            branches.pop_front();
         }
     }
 
-    // Remove completed instructions
-    for (int i = 0; i < num_done; i++)
-        rob.pop_back();
+    // Re-sort stage after flushing
+    std::vector<PipelineEntry> sorted;
+    sort_stage(sorted, Stage::EXEC);
 
-//    for (PipelineEntry& pe: sorted) {
-//        RS& rs = sched_q[pe.rs_idx];
-//
-//        // Find a free RB
-//        for (ResultBus &rb: result_buses) {
-//            // Assign result from FU to a free RB
-//            if (!rb.busy) {
-//                rb.busy = true;
-//                rb.tag = rs.dest_tag;
-//                rb.value = -1; // Don't really care about value from FU!
-//                rb.reg_no = rs.dest_reg;
-//                rb.inst_idx = rs.inst_idx;
-//
-//                // Free up the FU
-//                int fu_idx = find_fu_by_tag(rs.dest_tag);
-//                fu_table[fu_idx].busy = false;
-//                rb.fu_id = fu_idx;
-//
-//                // Advance to UPDATE stage
-//                InstStatus& is = status[pe.inst_idx];
-//                is.state = clock+1;
-//                is.stage = Stage::UPDATE;
-//
-//                pe.cycle = clock+1;
-//                stages.update.push_back(pe);
-//
-//                // Perform flush of ROB if needed!
-//                // Don't forget to set misprediction = NONE
-//
-//                // Remove from EXEC stage
-//                stages.exec.remove_if([pe](PipelineEntry p1) {
-//                    return pe.inst_idx == p1.inst_idx;
-//                });
-//
-//                break;
-//            }
-//        }
-//    }
+    for (PipelineEntry& pe: sorted) {
+        // Find correct entry in pipeline
+        RS& rs = sched_q[pe.rs_idx];
+
+        // Find a free RB
+        for (ResultBus &rb: result_buses) {
+            // Assign result from FU to a free RB
+            if (!rb.busy) {
+                rb.busy = true;
+                rb.tag = rs.dest_tag;
+                rb.value = -1; // Don't really care about value from FU!
+                rb.reg_no = rs.dest_reg;
+                rb.inst_idx = rs.inst_idx;
+
+                // Free up the FU
+                int fu_idx = find_fu_by_tag(rs.dest_tag);
+                fu_table[fu_idx].busy = false;
+                rb.fu_id = fu_idx;
+
+                // Advance to UPDATE stage
+                InstStatus& is = status[pe.inst_idx];
+                is.state = clock+1;
+                is.stage = Stage::UPDATE;
+
+                pe.cycle = clock+1;
+                stages.update.push_back(pe);
+
+                // Remove from EXEC stage
+                stages.exec.remove_if([pe](PipelineEntry p1) {
+                    return pe.inst_idx == p1.inst_idx;
+                });
+
+                break;
+            }
+        }
+    }
+}
+
+void Pipeline::update_prediction(Instruction& inst) {
+    // Update GHR entry in predictor
+    predictor->update(inst.addr, inst.taken);
+
+    // If predicted incorrect, flush everything
+    if (inst.taken != inst.p_taken) {
+        // Mark all instructions in all stages as "flushed"
+        // Flush only dummy inst. i.e. fetched AFTER the branch
+        for (Instruction& each: dispatch_q) {
+            InstStatus& is = status[each.idx];
+
+            if (is.dummy) {
+                if (is.disp == clock)
+                    is.disp = -1;
+
+                is.sched = -1;
+                is.exec = -1;
+                is.state = -1;
+            }
+        }
+
+        for (PipelineEntry& pe: stages.sched) {
+            InstStatus& is = status[pe.inst_idx];
+
+            if (is.dummy) {
+
+                if (is.sched == clock)
+                    is.sched = -1;
+
+                is.exec = -1;
+                is.state = -1;
+            }
+        }
+
+        for (PipelineEntry& pe: stages.exec) {
+            InstStatus& is = status[pe.inst_idx];
+            if (is.dummy) {
+                if (is.exec == clock)
+                    is.exec = -1;
+
+                is.state = -1;
+            }
+        }
+
+        // Free all FUs as well
+        for (FU& fu: fu_table) {
+            InstStatus& is = status[fu.inst_idx];
+
+            if (is.dummy)
+                fu.busy = false;
+        }
+
+        // Remove all post-branch inst. from the sched queue
+        for (RS& rs: sched_q) {
+            InstStatus& is = status[rs.inst_idx];
+
+            if (is.dummy)
+                rs.empty = true;
+        }
+
+        // Start fetching the "correct" instruction stream
+        ip = inst.ip + 1;
+        mp = Misprediction::NONE;
+
+        // Flush the ROB
+        int flush_count = 0;
+        int i;
+
+        for (i = 0; i < rob.size(); i++) {
+            if (rob[i].inst_idx == inst.idx)
+                break;
+
+            flush_count++;
+        }
+
+        for (i = 0; i < flush_count; i++)
+            rob.pop_front();
+
+        // Clear the dispatch queue
+        dispatch_q.clear();
+
+        // Clear out dummy instructions from SCHED and EXEC
+        auto pred = [inst](PipelineEntry& p1) {
+            return p1.dummy;
+        };
+
+        stages.sched.remove_if(pred);
+        stages.exec.remove_if(pred);
+    }
 }
 
 void Pipeline::state_update() {
@@ -592,35 +633,52 @@ void Pipeline::state_update() {
     for (PipelineEntry& pe: stages.update)
         copy.push_back(pe);
 
-    for (PipelineEntry& pe: copy) {
-        RS& rs = sched_q[pe.rs_idx];
+    // Start from ROB end ("head")
+    // If instruction is complete, put onto a RB
+    // If instruction is a branch, check if prediction correct
+    // If prediction wrong, flush EVERYTHING
 
-        int rb_idx = rb_find_tag(rs.dest_tag);
+    for (uint64_t i = rob.size(); i > 0; i--) {
+        // Stop checking ROB if instruction is not complete yet
+        ROBEntry re = rob[i - 1];
+        if (!re.complete)
+            break;
 
-        if (rb_idx != -1) {
-            ResultBus& rb = result_buses[rb_idx];
+        for (PipelineEntry& pe: copy) {
+            RS& rs = sched_q[pe.rs_idx];
 
-            // Look for broadcasted tag in reg_file; otherwise, it's a dest_reg = -1
-            if (rb.reg_no != -1) {
-                Register& reg = reg_file[rb.reg_no];
+            int rb_idx = rb_find_tag(rs.dest_tag);
 
-                if (reg.tag == rb.tag) {
-                    reg.ready = true;
-                    reg.value = rb.value;
+            if (rb_idx != -1) {
+                ResultBus& rb = result_buses[rb_idx];
+
+                // Look for broadcasted tag in reg_file; otherwise, it's a dest_reg = -1
+                if (rb.reg_no != -1) {
+                    Register& reg = reg_file[rb.reg_no];
+
+                    if (reg.tag == rb.tag) {
+                        reg.ready = true;
+                        reg.value = rb.value;
+                    }
                 }
+
+                rb.busy = false;
+
+                // Move to RETIRE stage
+                status[pe.inst_idx].stage = Stage::RETIRE;
+                pe.cycle = clock+1;
+                stages.retire.push_back(pe);
+
+                // Remove from UPDATE
+                stages.update.remove_if([pe](PipelineEntry p1) {
+                    return pe.inst_idx == p1.inst_idx;
+                });
+
+                // Remove from ROB
+                rob.pop_back();
+
+                break;
             }
-
-            rb.busy = false;
-
-            // Move to RETIRE stage
-            status[pe.inst_idx].stage = Stage::RETIRE;
-            pe.cycle = clock+1;
-            stages.retire.push_back(pe);
-
-            // Remove from UPDATE
-            stages.update.remove_if([pe](PipelineEntry p1) {
-                return pe.inst_idx == p1.inst_idx;
-            });
         }
     }
 }
@@ -649,8 +707,4 @@ int Pipeline::retire() {
     }
 
     return static_cast<int>(num_completed - prev_completed);
-}
-
-void Pipeline::flush_rob() {
-    // Flush ROB on branch misprediction
 }

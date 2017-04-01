@@ -4,8 +4,8 @@
 
 BranchPredictor::BranchPredictor(int n, int k) : n(n), k(k) {
     // GHR setup
-    int ghr_size = 3;
-    int ghr = 0;
+    ghr_size = 3;
+    ghr = 0;
 
     // Initialize prediction table (entry = 01 by default)
     for (int i = 0; i < n; i++) {
@@ -25,14 +25,13 @@ bool BranchPredictor::predict(int address) {
     std::vector<int>& counters = prediction_table[hash];
     int counter = counters[ghr];
 
-    if (counter >= (1 << k)/2)
-        return true;
-    else
-        return false;
+    bool prediction = counter >= (1 << s)/2;
+
+    return prediction;
 }
 
 void BranchPredictor::update(int address, bool taken) {
-    // Update Smith counter value based on branch result
+    // Update Smith counter value based on actual branch result
     int hash = (address / 4) % n;
     std::vector<int>& counters = prediction_table[hash];
 
@@ -47,13 +46,11 @@ void BranchPredictor::update(int address, bool taken) {
     }
 
     // Update GHR and table based on branch result
-    int max_size = 1 << ghr_size;
-
     if (taken) {
         // Right shift 1 into GHR
-        ghr = ((ghr << 1) + 1) & ((1 << max_size) - 1);
+        ghr = ((ghr << 1) + 1) & ((1 << ghr_size) - 1);
     } else {
         // Right shift 0 into GHR
-        ghr = (ghr << 1) & ((1 << max_size) - 1);
+        ghr = (ghr << 1) & ((1 << ghr_size) - 1);
     }
 }

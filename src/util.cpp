@@ -1,7 +1,7 @@
 #include <iostream>
 #include <unistd.h>
 
-#include "../include/util.hpp"
+#include "util.hpp"
 
 void print_usage() {
     std::cout << "Usage: ./procsim –r R –f F –j J –k K –l L -i <trace_file>" << std::endl;
