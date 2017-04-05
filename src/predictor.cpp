@@ -36,7 +36,7 @@ void BranchPredictor::update(int address, bool taken) {
     std::vector<int>& counters = prediction_table[hash];
 
     if (taken) {
-        if (counters[ghr] < (1 << k) - 1)
+        if (counters[ghr] < (1 << s) - 1)
             counters[ghr] = counters[ghr] + 1;
     }
 

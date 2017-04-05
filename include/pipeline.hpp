@@ -142,9 +142,11 @@ private:
     void sort_stage(std::vector<PipelineEntry>& l, Stage s);
 
     std::deque<Instruction> dispatch_q;
+    std::deque<Instruction> fetch_q;
 
     std::vector<RS> sched_q;
     void schedq_insert(Instruction& inst, RS& rs);
+    int schedq_size = 0;
 
     std::vector<ResultBus> result_buses;
     int rb_find_tag(int tag); // Returns ResultBus id which is broadcasting this tag, or -1
@@ -165,8 +167,6 @@ private:
     bool branch_flush = false;
     int branch_idx = -1;
     std::deque<int> branches;
-    void fetch_garbage(int count, bool taken);
-    void update_prediction(Instruction& re);
 
     // Reorder buffer
     std::deque<ROBEntry> rob;
@@ -183,6 +183,7 @@ private:
     void dispatch();
 
     // 3. Scheduling unit
+    void schedule();
     void check_buses();
     void wake_up();
 

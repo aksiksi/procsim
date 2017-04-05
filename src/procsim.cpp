@@ -19,7 +19,6 @@ int main(int argc, char** argv) {
 
     // Output results file
     std::string output_file = inputargs.trace_file + ".out";
-    std::ofstream output (output_file);
 
     // Stores data for all trace file lines
     std::vector<Instruction> instructions;
@@ -72,6 +71,8 @@ int main(int argc, char** argv) {
     Pipeline p (instructions, opt);
 
     p.start();
+
+    std::ofstream output (output_file);
 
     // Pipeline settings
     output << "Processor settings:" << std::endl;
