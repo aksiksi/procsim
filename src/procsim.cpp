@@ -115,12 +115,14 @@ int main(int argc, char** argv) {
     // Same stats to stdout
     std::cout.precision(12);
     std::cout << std::endl << "Processor stats:" << std::endl;
-    std::cout << "Total instructions: " << proc_stats.total_instructions << std::endl;
+    std::cout << "Total branch instructions: " << proc_stats.total_branches << std::endl;
+    std::cout << "Total correctly predicted branches: " << proc_stats.correct_branches << std::endl;
+    std::cout << "Prediction accuracy: " << proc_stats.prediction_accuracy << std::endl;
     std::cout << "Avg. dispatch queue size: " << proc_stats.avg_disp_size << std::endl;
     std::cout << "Max dispatch queue size: " << proc_stats.max_disp_size << std::endl;
     std::cout << "Avg. inst. issue per cycle: " << proc_stats.avg_inst_issue << std::endl;
     std::cout << "Avg. inst. retired per cycle: " << proc_stats.avg_inst_retired << std::endl;
-    std::cout << "Total run time: " << proc_stats.cycle_count << std::endl << std::endl;
+    std::cout << "Total run time (cycles): " << proc_stats.cycle_count << std::endl << std::endl;
 
     return 0;
 }

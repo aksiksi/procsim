@@ -1,5 +1,4 @@
 #include <algorithm>
-#include <iostream>
 
 #include "pipeline.hpp"
 
@@ -7,8 +6,6 @@ Pipeline::Pipeline(std::vector<Instruction>& ins, PipelineOptions& opt)
         : options(opt), instructions(ins) {}
 
 void Pipeline::init() {
-    std::cout.sync_with_stdio(false);
-
     // Init IP and clock
     ip = 0;
     clock = 0;
@@ -104,13 +101,14 @@ void Pipeline::start() {
         clock++;
     }
 
-    clock--;
+    clock -= 2;
 
     // Collect stats
     proc_stats.cycle_count = clock;
     proc_stats.avg_disp_size /= clock;
     proc_stats.avg_inst_issue /= clock;
     proc_stats.avg_inst_retired /= clock;
+    proc_stats.prediction_accuracy = static_cast<double>(proc_stats.correct_branches) / proc_stats.total_branches;
 
     // Cleanup
     delete predictor;
@@ -135,17 +133,6 @@ int Pipeline::fetch() {
         is.fetch = clock;
         is.stage = Stage::FETCH;
         is.inst = i;
-
-        // Perform branch prediction (since it's a branch!)
-//        if (inst.branch_addr != -1) {
-//            bool prediction = predictor->predict(inst.addr);
-//
-//            std::cout << "Branch: " << std::hex << inst.branch_addr << " Actual: " << inst.taken << " Predicted: " << std::dec << prediction;
-//            std::cout << "  Index: " << inst.idx << " GHR: " << predictor->get_ghr() << " Inst: " << is.inst << std::endl;
-//
-//            // Store prediction with inst.
-//            inst.p_taken = prediction;
-//        }
 
         status.push_back(is);
         fetch_q.push_back(inst);
@@ -175,9 +162,6 @@ void Pipeline::dispatch() {
         if (inst.branch_addr != -1) {
             bool prediction = predictor->predict(inst.addr);
 
-            std::cout << "Branch: " << std::hex << inst.branch_addr << " Actual: " << inst.taken << " Predicted: " << std::dec << prediction;
-            std::cout << "  Index: " << inst.idx << " GHR: " << predictor->get_ghr() << " Inst: " << is.inst << std::endl;
-
             // Store prediction with inst.
             inst.p_taken = prediction;
             instructions[inst.idx].p_taken = prediction;
@@ -187,9 +171,11 @@ void Pipeline::dispatch() {
                     mp = Misprediction::TAKEN;
                 else
                     mp = Misprediction::NOT_TAKEN;
-
-                branch_idx = inst.idx;
+            } else {
+                proc_stats.correct_branches++;
             }
+
+            proc_stats.total_branches++;
         }
 
         dispatch_q.push_back(inst);

@@ -15,6 +15,9 @@ struct Stats {
     double avg_disp_size;
     uint64_t max_disp_size;
     uint64_t cycle_count;
+    uint64_t total_branches;
+    uint64_t correct_branches;
+    double prediction_accuracy;
 };
 
 enum Stage {
@@ -164,12 +167,6 @@ private:
     // Branch prediction support
     BranchPredictor* predictor;
     Misprediction mp;
-    bool branch_flush = false;
-    int branch_idx = -1;
-    std::deque<int> branches;
-
-    // Reorder buffer
-    std::deque<ROBEntry> rob;
 
     // Init the pipeline
     void init();
