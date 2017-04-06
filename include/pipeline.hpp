@@ -4,6 +4,7 @@
 #include <deque>
 #include <list>
 #include <vector>
+#include <algorithm>
 
 #include "predictor.hpp"
 

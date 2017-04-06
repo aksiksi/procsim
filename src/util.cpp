@@ -1,5 +1,7 @@
 #include <iostream>
 #include <unistd.h>
+#include <fstream>
+#include <sstream>
 
 #include "util.hpp"
 
@@ -59,4 +61,38 @@ void parse_args(int argc, char **argv, InputArgs& args) {
 
     if (args.trace_file.empty())
         args.trace_file = argv[argc-1];
+}
+
+void parse_trace(std::string file, std::vector<Instruction>& instructions) {
+    std::ifstream trace_file (file);
+
+    if (!trace_file.is_open())
+        exit_on_error("Unable to open trace file specified (" + file + ")");
+
+    int idx = 0;
+    std::string line;
+    Instruction inst;
+
+    while (getline(trace_file, line)) {
+        std::istringstream iss (line);
+
+        inst = {};
+        iss >> std::hex >> inst.addr >> std::dec;
+        iss >> inst.fu_type;
+        iss >> inst.dest_reg;
+        iss >> inst.src_reg[0];
+        iss >> inst.src_reg[1];
+
+        // If branch line, extract branch address and taken flag
+        if (!iss.eof()) {
+            iss >> std::hex >> inst.branch_addr >> std::dec;
+            iss >> inst.taken;
+        }
+
+        inst.idx = idx++;
+
+        instructions.push_back(inst);
+    }
+
+    trace_file.close();
 }

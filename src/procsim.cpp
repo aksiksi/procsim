@@ -14,45 +14,12 @@ int main(int argc, char** argv) {
     InputArgs inputargs = {};
     parse_args(argc, argv, inputargs);
 
-    // Input file
-    std::ifstream trace_file (inputargs.trace_file);
-
     // Output results file
     std::string output_file = inputargs.trace_file + ".out";
 
-    // Stores data for all trace file lines
+    // Parse trace lines and store data in a vector of Instruction
     std::vector<Instruction> instructions;
-    Instruction inst;
-
-    if (!trace_file.is_open())
-        exit_on_error("Unable to open trace file specified (" + inputargs.trace_file + ")");
-
-    std::string line;
-
-    int idx = 0;
-
-    while (getline(trace_file, line)) {
-        std::istringstream iss (line);
-
-        inst = {};
-        iss >> std::hex >> inst.addr >> std::dec;
-        iss >> inst.fu_type;
-        iss >> inst.dest_reg;
-        iss >> inst.src_reg[0];
-        iss >> inst.src_reg[1];
-
-        // If branch line, extract branch address and taken flag
-        if (!iss.eof()) {
-            iss >> std::hex >> inst.branch_addr >> std::dec;
-            iss >> inst.taken;
-        }
-
-        inst.idx = idx++;
-
-        instructions.push_back(inst);
-    }
-
-    trace_file.close();
+    parse_trace(inputargs.trace_file, instructions);
 
     std::cout << "* Input file: " << inputargs.trace_file << std::endl;
     std::cout << "*** " << instructions.size() << " instructions read from trace file" << std::endl;

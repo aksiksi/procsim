@@ -21,4 +21,4 @@ clean:
 	rm -f $(OBJ)/* $(PROCSIM)
 
 archive:
-	tar -cvf project2_checkpoint_aksiksi3.tar.gz README.txt src/ obj/ include/ Makefile
+	tar -cvf project2_aksiksi3.tar.gz README.txt src/ obj/ include/ Makefile
