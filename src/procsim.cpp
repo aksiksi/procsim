@@ -42,7 +42,7 @@ int main(int argc, char** argv) {
     std::ofstream output (output_file);
 
     // Pipeline settings
-    output << "Processor settings:" << std::endl;
+    output << "Processor Settings" << std::endl;
     output << "R: " << opt.R << std::endl;
     output << "k0: " << opt.J << std::endl;
     output << "k1: " << opt.K << std::endl;
@@ -66,30 +66,32 @@ int main(int argc, char** argv) {
     std::cout << "*** Pipeline completed successfully (cycles=" << proc_stats.cycle_count << ")" << std::endl;
 
     // Final stats
-    output.precision(12);
+    output.precision(8);
     output << std::endl << "Processor stats:" << std::endl;
-    output << "Total instructions: " << proc_stats.total_instructions << std::endl;
-    output << "Avg. dispatch queue size: " << proc_stats.avg_disp_size << std::endl;
-    output << "Max dispatch queue size: " << proc_stats.max_disp_size << std::endl;
-    output << "Avg. inst. issue per cycle: " << proc_stats.avg_inst_issue << std::endl;
-    output << "Avg. inst. retired per cycle: " << proc_stats.avg_inst_retired << std::endl;
-    output << "Total run time: " << proc_stats.cycle_count << std::endl << std::endl;
+    output << "Total branch instructions: " << proc_stats.total_branches << std::endl;
+    output << "Total correct predicted branch instructions: " << proc_stats.correct_branches << std::endl;
+    output << "prediction accuracy: " << proc_stats.prediction_accuracy << std::endl;
+    output << "Avg Dispatch queue size: " << proc_stats.avg_disp_size << std::endl;
+    output << "Maximum Dispatch queue size: " << proc_stats.max_disp_size << std::endl;
+    output << "Avg inst Issue per cycle: " << proc_stats.avg_inst_issue << std::endl;
+    output << "Avg inst retired per cycle: " << proc_stats.avg_inst_retired << std::endl;
+    output << "Total run time (cycles): " << proc_stats.cycle_count << std::endl;
 
     std::cout << "* Results written to: " << output_file << std::endl;
 
     output.close();
 
     // Same stats to stdout
-    std::cout.precision(12);
+    std::cout.precision(8);
     std::cout << std::endl << "Processor stats:" << std::endl;
     std::cout << "Total branch instructions: " << proc_stats.total_branches << std::endl;
-    std::cout << "Total correctly predicted branches: " << proc_stats.correct_branches << std::endl;
-    std::cout << "Prediction accuracy: " << proc_stats.prediction_accuracy << std::endl;
-    std::cout << "Avg. dispatch queue size: " << proc_stats.avg_disp_size << std::endl;
-    std::cout << "Max dispatch queue size: " << proc_stats.max_disp_size << std::endl;
-    std::cout << "Avg. inst. issue per cycle: " << proc_stats.avg_inst_issue << std::endl;
-    std::cout << "Avg. inst. retired per cycle: " << proc_stats.avg_inst_retired << std::endl;
-    std::cout << "Total run time (cycles): " << proc_stats.cycle_count << std::endl << std::endl;
+    std::cout << "Total correct predicted branch instructions: " << proc_stats.correct_branches << std::endl;
+    std::cout << "prediction accuracy: " << proc_stats.prediction_accuracy << std::endl;
+    std::cout << "Avg Dispatch queue size: " << proc_stats.avg_disp_size << std::endl;
+    std::cout << "Maximum Dispatch queue size: " << proc_stats.max_disp_size << std::endl;
+    std::cout << "Avg inst Issue per cycle: " << proc_stats.avg_inst_issue << std::endl;
+    std::cout << "Avg inst retired per cycle: " << proc_stats.avg_inst_retired << std::endl;
+    std::cout << "Total run time (cycles): " << proc_stats.cycle_count << std::endl;
 
     return 0;
 }

@@ -22,4 +22,4 @@ clean:
 	rm -f $(OBJ)/* $(PROCSIM)
 
 archive:
-	tar -cvf project2_aksiksi3.tar.gz README.txt src/ obj/ include/ Makefile traces/*.out
+	tar -cvf project2_aksiksi3.tar.gz README.txt src/ obj/ include/ Makefile traces/*.trace.out
