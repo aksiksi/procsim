@@ -18,4 +18,4 @@ The output file will have the same name but with the extension `.out` and writte
 
 ### Pipeline Optimizer
 
-Place traces in `traces/`, then run `./procopt`. Optimal configurations are output to file `procopt.out`. Full data in CSV format for each trace is output to `procopt.full.out`.
+Firs, place traces in `traces/`, then run `./procopt`. Optimal configurations are output to file `procopt.out`. Full data in CSV format for each trace is output to `procopt.full.out`.

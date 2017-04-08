@@ -6,6 +6,9 @@
 #include <vector>
 #include <algorithm>
 
+// For uint64_t
+#include <cstdint>
+
 #include "predictor.hpp"
 
 struct Stats {

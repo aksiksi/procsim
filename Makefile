@@ -3,6 +3,7 @@ LFLAGS=-std=c++11
 CFLAGS=-c -O3 -std=c++11
 OBJ=obj
 INCLUDE=-Iinclude
+HEADERS=include
 
 DEPS=$(OBJ)/util.o $(OBJ)/pipeline.o $(OBJ)/predictor.o
 PROCSIM=procsim
@@ -22,4 +23,4 @@ clean:
 	rm -f $(OBJ)/* $(PROCSIM)
 
 archive:
-	tar -cvf project2_aksiksi3.tar.gz README.txt src/ obj/ include/ Makefile traces/*.trace.out
+	tar -cvf project2_aksiksi3.tar.gz project2-report.pdf README.txt src/ obj/ include/ Makefile traces/*.trace.out

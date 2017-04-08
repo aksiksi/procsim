@@ -56,11 +56,8 @@ void Pipeline::init() {
     int n = 128;
     int k = 3;
     predictor = new BranchPredictor(n, k);
+    mp = Misprediction::NONE;
 }
-
-/**
- * NOTES: clock = 4, state_update problem for idx = 1
- */
 
 void Pipeline::start() {
     init();
@@ -92,7 +89,6 @@ void Pipeline::start() {
         ip += fetch();
 
         // Record dispatch queue size
-        // TODO: count only instructions that have stage == DISP
         if (dispatch_q.size() > proc_stats.max_disp_size)
             proc_stats.max_disp_size = dispatch_q.size();
 
